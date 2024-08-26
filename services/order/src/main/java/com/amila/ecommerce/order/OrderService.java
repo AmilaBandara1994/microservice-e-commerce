@@ -6,6 +6,8 @@ import com.amila.ecommerce.kafka.OrderConfirmation;
 import com.amila.ecommerce.kafka.OrderProducer;
 import com.amila.ecommerce.orderline.OrderLineRequest;
 import com.amila.ecommerce.orderline.OrderLineService;
+import com.amila.ecommerce.payment.PaymentClient;
+import com.amila.ecommerce.payment.PaymentRequest;
 import com.amila.ecommerce.product.ProductClient;
 import com.amila.ecommerce.product.PurchaseRequest;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,6 +27,7 @@ public class OrderService {
     private final OrderMapper mapper;
     private final OrderLineService orderLineService;
     private final OrderProducer orderProducer;
+    private final PaymentClient paymentClient;
     public Integer createOrder(OrderRequest request) {
         var customer  = this.customerClient.findCustomerById(request.customerId())
                 .orElseThrow(()-> new BusinessException("Cannot create or der:: No customer exists with the provided ID "));
@@ -43,6 +46,14 @@ public class OrderService {
                     )
             );
         }
+        var paymentRequest = new PaymentRequest(
+                request.amount(),
+                request.paymentMethod(),
+                order.getId(),
+                order.getReference(),
+                customer
+        );
+        paymentClient.requestOrderPayment(paymentRequest);
         orderProducer.sendOderConformation(
                 new OrderConfirmation(
                         request.reference(),
